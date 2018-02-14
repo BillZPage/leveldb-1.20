@@ -65,10 +65,11 @@ class Reader {
   Slice buffer_;
   bool eof_;   // Last Read() indicated EOF by returning < kBlockSize
 
+  //最新record的位置
   // Offset of the last record returned by ReadRecord.
   uint64_t last_record_offset_;
   // Offset of the first location past the end of buffer_.
-  uint64_t end_of_buffer_offset_;
+  uint64_t end_of_buffer_offset_;	//buffer尾部的block地址
 
   // Offset at which to start looking for the first record to return
   uint64_t const initial_offset_;

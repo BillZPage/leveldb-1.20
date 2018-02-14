@@ -45,6 +45,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
     return Status::Corruption("malformed WriteBatch (too small)");
   }
 
+  //kHeader = sequence+count
   input.remove_prefix(kHeader);
   Slice key, value;
   int found = 0;
@@ -53,7 +54,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
     char tag = input[0];
     input.remove_prefix(1);
     switch (tag) {
-      case kTypeValue:
+      case kTypeValue:			//插入值
         if (GetLengthPrefixedSlice(&input, &key) &&
             GetLengthPrefixedSlice(&input, &value)) {
           handler->Put(key, value);
@@ -61,7 +62,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
           return Status::Corruption("bad WriteBatch Put");
         }
         break;
-      case kTypeDeletion:
+      case kTypeDeletion:		//删除值
         if (GetLengthPrefixedSlice(&input, &key)) {
           handler->Delete(key);
         } else {
@@ -72,6 +73,8 @@ Status WriteBatch::Iterate(Handler* handler) const {
         return Status::Corruption("unknown WriteBatch tag");
     }
   }
+  
+  //count记录key-value个数
   if (found != WriteBatchInternal::Count(this)) {
     return Status::Corruption("WriteBatch has wrong count");
   } else {
@@ -130,6 +133,8 @@ Status WriteBatchInternal::InsertInto(const WriteBatch* b,
   MemTableInserter inserter;
   inserter.sequence_ = WriteBatchInternal::Sequence(b);
   inserter.mem_ = memtable;
+  
+  //遍历batch内容，执行插入器
   return b->Iterate(&inserter);
 }
 

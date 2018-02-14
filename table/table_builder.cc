@@ -89,6 +89,7 @@ Status TableBuilder::ChangeOptions(const Options& options) {
   return Status::OK();
 }
 
+
 void TableBuilder::Add(const Slice& key, const Slice& value) {
   Rep* r = rep_;
   assert(!r->closed);
@@ -97,19 +98,33 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
 
+  //添加索引block
+  //pending_index_entry为true，表示data block的第一个k-v。
+  //Index block只记录data black第1个k-v。
   if (r->pending_index_entry) {
+	//data_block应该为空
     assert(r->data_block.empty());
+	
+	//获取大于等于last_key并且小于等于key的字符串，赋值到last_key
     r->options.comparator->FindShortestSeparator(&r->last_key, key);
-    std::string handle_encoding;
+    
+	//转换offset和size到字符串
+	std::string handle_encoding;
     r->pending_handle.EncodeTo(&handle_encoding);
+	
+	//添加索引块,组装索引块
     r->index_block.Add(r->last_key, Slice(handle_encoding));
+	
+	//
     r->pending_index_entry = false;
   }
 
+  //添加过滤block
   if (r->filter_block != NULL) {
     r->filter_block->AddKey(key);
   }
 
+  //添加数据block
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);

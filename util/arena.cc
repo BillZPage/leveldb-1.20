@@ -20,7 +20,10 @@ Arena::~Arena() {
   }
 }
 
+
+//
 char* Arena::AllocateFallback(size_t bytes) {
+  //申请大于1kb空间，直接申请
   if (bytes > kBlockSize / 4) {
     // Object is more than a quarter of our block size.  Allocate it separately
     // to avoid wasting too much space in leftover bytes.
@@ -28,6 +31,7 @@ char* Arena::AllocateFallback(size_t bytes) {
     return result;
   }
 
+  //申请小于1kb的空间则先申请4kb，然后设置申请的起点和余下的长度
   // We waste the remaining space in the current block.
   alloc_ptr_ = AllocateNewBlock(kBlockSize);
   alloc_bytes_remaining_ = kBlockSize;
@@ -38,7 +42,9 @@ char* Arena::AllocateFallback(size_t bytes) {
   return result;
 }
 
+//申请的地址尾部是字节对齐
 char* Arena::AllocateAligned(size_t bytes) {
+  //8字节对齐
   const int align = (sizeof(void*) > 8) ? sizeof(void*) : 8;
   assert((align & (align-1)) == 0);   // Pointer size should be a power of 2
   size_t current_mod = reinterpret_cast<uintptr_t>(alloc_ptr_) & (align-1);
@@ -57,8 +63,12 @@ char* Arena::AllocateAligned(size_t bytes) {
   return result;
 }
 
+//申请指定字节内存空间，添加该空间到blocks_,
 char* Arena::AllocateNewBlock(size_t block_bytes) {
+  //申请空间
   char* result = new char[block_bytes];
+  
+  //保存申请空间的头结点
   blocks_.push_back(result);
   memory_usage_.NoBarrier_Store(
       reinterpret_cast<void*>(MemoryUsage() + block_bytes + sizeof(char*)));

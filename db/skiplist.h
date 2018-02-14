@@ -122,6 +122,7 @@ class SkipList {
   // Return true if key is greater than the data stored in "n"
   bool KeyIsAfterNode(const Key& key, Node* n) const;
 
+  //返回与key相等或者比key大的最小结点
   // Return the earliest node that comes at or after key.
   // Return NULL if there is no such node.
   //
@@ -258,6 +259,7 @@ bool SkipList<Key,Comparator>::KeyIsAfterNode(const Key& key, Node* n) const {
   return (n != NULL) && (compare_(n->key, key) < 0);
 }
 
+//找到大于等于key的最小节点
 template<typename Key, class Comparator>
 typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindGreaterOrEqual(const Key& key, Node** prev)
     const {
@@ -268,8 +270,12 @@ typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindGreaterOr
     if (KeyIsAfterNode(key, next)) {
       // Keep searching in this list
       x = next;
-    } else {
-      if (prev != NULL) prev[level] = x;
+    } 
+	else 
+	{
+      if (prev != NULL) 
+		  prev[level] = x;
+	  
       if (level == 0) {
         return next;
       } else {
@@ -280,6 +286,7 @@ typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindGreaterOr
   }
 }
 
+//找到比key小的最大节点
 template<typename Key, class Comparator>
 typename SkipList<Key,Comparator>::Node*
 SkipList<Key,Comparator>::FindLessThan(const Key& key) const {
@@ -288,7 +295,10 @@ SkipList<Key,Comparator>::FindLessThan(const Key& key) const {
   while (true) {
     assert(x == head_ || compare_(x->key, key) < 0);
     Node* next = x->Next(level);
+	
+	//
     if (next == NULL || compare_(next->key, key) >= 0) {
+		
       if (level == 0) {
         return x;
       } else {
@@ -301,6 +311,7 @@ SkipList<Key,Comparator>::FindLessThan(const Key& key) const {
   }
 }
 
+//定位到最后一个元素
 template<typename Key, class Comparator>
 typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindLast()
     const {
@@ -321,6 +332,7 @@ typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindLast()
   }
 }
 
+
 template<typename Key, class Comparator>
 SkipList<Key,Comparator>::SkipList(Comparator cmp, Arena* arena)
     : compare_(cmp),
@@ -338,11 +350,14 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
   // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
   // here since Insert() is externally synchronized.
   Node* prev[kMaxHeight];
+  
+  //定位到比key大的最小结点
   Node* x = FindGreaterOrEqual(key, prev);
 
   // Our data structure does not allow duplicate insertion
   assert(x == NULL || !Equal(key, x->key));
 
+  //获取随机高度
   int height = RandomHeight();
   if (height > GetMaxHeight()) {
     for (int i = GetMaxHeight(); i < height; i++) {
@@ -360,7 +375,10 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
     max_height_.NoBarrier_Store(reinterpret_cast<void*>(height));
   }
 
+  //新建结点
   x = NewNode(key, height);
+  
+  //插入节点
   for (int i = 0; i < height; i++) {
     // NoBarrier_SetNext() suffices since we will add a barrier when
     // we publish a pointer to "x" in prev[i].
@@ -369,6 +387,7 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
   }
 }
 
+//判断是否包括key
 template<typename Key, class Comparator>
 bool SkipList<Key,Comparator>::Contains(const Key& key) const {
   Node* x = FindGreaterOrEqual(key, NULL);

@@ -24,7 +24,7 @@ Reader::Reader(SequentialFile* file, Reporter* reporter, bool checksum,
       buffer_(),
       eof_(false),
       last_record_offset_(0),
-      end_of_buffer_offset_(0),
+      end_of_buffer_offset_(0),		
       initial_offset_(initial_offset),
       resyncing_(initial_offset > 0) {
 }
@@ -33,16 +33,19 @@ Reader::~Reader() {
   delete[] backing_store_;
 }
 
+//跳到离initial block起始位置
 bool Reader::SkipToInitialBlock() {
   size_t offset_in_block = initial_offset_ % kBlockSize;
   uint64_t block_start_location = initial_offset_ - offset_in_block;
 
+  //block内部偏置在trailor区，重新设置block起始地址
   // Don't search a block if we'd be in the trailer
   if (offset_in_block > kBlockSize - 6) {
     offset_in_block = 0;
     block_start_location += kBlockSize;
   }
 
+  //
   end_of_buffer_offset_ = block_start_location;
 
   // Skip to start of first block that can contain the initial record
@@ -57,6 +60,7 @@ bool Reader::SkipToInitialBlock() {
   return true;
 }
 
+//从文件中读取完整的record，保存在scratch，由record指向.record只有数据
 bool Reader::ReadRecord(Slice* record, std::string* scratch) {
   if (last_record_offset_ < initial_offset_) {
     if (!SkipToInitialBlock()) {
@@ -73,6 +77,8 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
 
   Slice fragment;
   while (true) {
+	  
+	//读1条record
     const unsigned int record_type = ReadPhysicalRecord(&fragment);
 
     // ReadPhysicalRecord may have only had an empty trailer remaining in its
@@ -93,6 +99,8 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
     }
 
     switch (record_type) {
+			
+	  //record是完整的
       case kFullType:
         if (in_fragmented_record) {
           // Handle bug in earlier versions of log::Writer where
@@ -196,14 +204,20 @@ void Reader::ReportDrop(uint64_t bytes, const Status& reason) {
   }
 }
 
+
+//读入record数据
 unsigned int Reader::ReadPhysicalRecord(Slice* result) {
   while (true) {
     if (buffer_.size() < kHeaderSize) {
       if (!eof_) {
         // Last read was a full read, so this is a trailer to skip
         buffer_.clear();
+		
+		//读1个block
         Status status = file_->Read(kBlockSize, &buffer_, backing_store_);
-        end_of_buffer_offset_ += buffer_.size();
+        
+		//更新buffer尾部地址
+		end_of_buffer_offset_ += buffer_.size();
         if (!status.ok()) {
           buffer_.clear();
           ReportDrop(kBlockSize, status);
@@ -225,10 +239,12 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
 
     // Parse the header
     const char* header = buffer_.data();
-    const uint32_t a = static_cast<uint32_t>(header[4]) & 0xff;
+    const uint32_t a = static_cast<uint32_t>(header[4]) & 0xff; //length
     const uint32_t b = static_cast<uint32_t>(header[5]) & 0xff;
     const unsigned int type = header[6];
     const uint32_t length = a | (b << 8);
+	
+	//record长度有误
     if (kHeaderSize + length > buffer_.size()) {
       size_t drop_size = buffer_.size();
       buffer_.clear();
@@ -242,6 +258,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
       return kEof;
     }
 
+	//类型有误
     if (type == kZeroType && length == 0) {
       // Skip zero length record without reporting any drops since
       // such records are produced by the mmap based writing code in
@@ -275,6 +292,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
       return kBadRecord;
     }
 
+	//返回record数据
     *result = Slice(header + kHeaderSize, length);
     return type;
   }

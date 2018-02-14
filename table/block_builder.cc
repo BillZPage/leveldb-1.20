@@ -70,24 +70,30 @@ Slice BlockBuilder::Finish() {
   return Slice(buffer_);
 }
 
+//组装块
 void BlockBuilder::Add(const Slice& key, const Slice& value) {
   Slice last_key_piece(last_key_);
   assert(!finished_);
   assert(counter_ <= options_->block_restart_interval);
   assert(buffer_.empty() // No values yet?
          || options_->comparator->Compare(key, last_key_piece) > 0);
+  
+  //计算共享字符串大小。一个块中，每16个record就要设置一个restart点，restart保存了record的起始位置。
   size_t shared = 0;
   if (counter_ < options_->block_restart_interval) {
     // See how much sharing to do with previous string
     const size_t min_length = std::min(last_key_piece.size(), key.size());
+	
     while ((shared < min_length) && (last_key_piece[shared] == key[shared])) {
       shared++;
     }
   } else {
     // Restart compression
     restarts_.push_back(buffer_.size());
-    counter_ = 0;
+    counter_ = 0;	//restart点到达16就要创建新的重启点
   }
+  
+  //计算非共享字符串大小
   const size_t non_shared = key.size() - shared;
 
   // Add "<shared><non_shared><value_size>" to buffer_

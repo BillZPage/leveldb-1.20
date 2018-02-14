@@ -22,21 +22,33 @@ Status BuildTable(const std::string& dbname,
                   FileMetaData* meta) {
   Status s;
   meta->file_size = 0;
+  
+  //MEMTABLE第1个key-value
   iter->SeekToFirst();
 
+  //fname = xxx.ldb
   std::string fname = TableFileName(dbname, meta->number);
   if (iter->Valid()) {
+	//打开xxx.ldb
     WritableFile* file;
     s = env->NewWritableFile(fname, &file);
     if (!s.ok()) {
       return s;
     }
 
+	//1 设置meta文件最小key和最大key
+	//2 添加key-value
     TableBuilder* builder = new TableBuilder(options, file);
+	
+	//获取最小key
     meta->smallest.DecodeFrom(iter->key());
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();
+	  
+	  //设置最大key
       meta->largest.DecodeFrom(key);
+	  
+	  //添加key
       builder->Add(key, iter->value());
     }
 

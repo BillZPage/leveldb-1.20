@@ -119,6 +119,7 @@ static bool GetLevel(Slice* input, int* level) {
   }
 }
 
+//½âÂërecord
 Status VersionEdit::DecodeFrom(const Slice& src) {
   Clear();
   Slice input = src;

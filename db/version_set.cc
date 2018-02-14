@@ -661,6 +661,7 @@ class VersionSet::Builder {
     base_->Unref();
   }
 
+  //添加需要删除的文件和新添加的文件
   // Apply all of the edits in *edit to the current state.
   void Apply(VersionEdit* edit) {
     // Update compaction pointers
@@ -904,6 +905,8 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
 
 //基于版本恢复数据
 Status VersionSet::Recover(bool *save_manifest) {
+	
+  //
   struct LogReporter : public log::Reader::Reporter {
     Status* status;
     virtual void Corruption(size_t bytes, const Status& s) {
@@ -913,6 +916,8 @@ Status VersionSet::Recover(bool *save_manifest) {
 
   // Read "CURRENT" file, which contains a pointer to the current manifest file
   std::string current;
+  
+  //获取current文件内容
   Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
   if (!s.ok()) {
     return s;
@@ -922,6 +927,7 @@ Status VersionSet::Recover(bool *save_manifest) {
   }
   current.resize(current.size() - 1);
 
+  //获取manifest文件绝对路径，创建该文件的序列文件对象
   std::string dscname = dbname_ + "/" + current;
   SequentialFile* file;
   s = env_->NewSequentialFile(dscname, &file);
@@ -942,11 +948,17 @@ Status VersionSet::Recover(bool *save_manifest) {
   {
     LogReporter reporter;
     reporter.status = &s;
+	
+	//LOG的读方式
     log::Reader reader(file, &reporter, true/*checksum*/, 0/*initial_offset*/);
     Slice record;
     std::string scratch;
+	
+	
     while (reader.ReadRecord(&record, &scratch) && s.ok()) {
       VersionEdit edit;
+	  
+	  //解码manifest文件
       s = edit.DecodeFrom(record);
       if (s.ok()) {
         if (edit.has_comparator_ &&
@@ -1004,7 +1016,9 @@ Status VersionSet::Recover(bool *save_manifest) {
 
   if (s.ok()) {
     Version* v = new Version(this);
-    builder.SaveTo(v);
+    
+	//保存当前状态
+	builder.SaveTo(v);
     // Install recovered version
     Finalize(v);
     AppendVersion(v);

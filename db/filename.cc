@@ -47,6 +47,7 @@ std::string DescriptorFileName(const std::string& dbname, uint64_t number) {
   return dbname + buf;
 }
 
+//获取CURRENT绝对路径名称
 std::string CurrentFileName(const std::string& dbname) {
   return dbname + "/CURRENT";
 }

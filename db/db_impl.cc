@@ -174,6 +174,7 @@ DBImpl::~DBImpl() {
   }
 }
 
+//创建新的数据库
 Status DBImpl::NewDB() {
   VersionEdit new_db;
   new_db.SetComparatorName(user_comparator()->Name());
@@ -280,12 +281,15 @@ void DBImpl::DeleteObsoleteFiles() {
   }
 }
 
+
+//从log文件恢复数据库或者创建新的数据库
 Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
   mutex_.AssertHeld();
 
   // Ignore error from CreateDir since the creation of the DB is
   // committed only when the descriptor is created, and this directory
   // may already exist from a previous failed creation attempt.
+  //创建数据库目录
   env_->CreateDir(dbname_);
   
   //保证只有一个程序访问数据库
@@ -316,7 +320,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
     }
   }
 
-  //基于log恢复db
+  //基于manifest恢复version
   s = versions_->Recover(save_manifest);
   if (!s.ok()) {
     return s;
@@ -333,12 +337,17 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
   const uint64_t min_log = versions_->LogNumber();
   const uint64_t prev_log = versions_->PrevLogNumber();
   std::vector<std::string> filenames;
+  
+  //获取dbname_下的文件
   s = env_->GetChildren(dbname_, &filenames);
   if (!s.ok()) {
     return s;
   }
+    
   std::set<uint64_t> expected;
   versions_->AddLiveFiles(&expected);
+  
+  //获取log号
   uint64_t number;
   FileType type;
   std::vector<uint64_t> logs;
@@ -356,6 +365,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
     return Status::Corruption(buf, TableFileName(dbname_, *(expected.begin())));
   }
 
+  //顺序地的恢复从log恢复数据
   // Recover in the order in which the logs were generated
   std::sort(logs.begin(), logs.end());
   for (size_t i = 0; i < logs.size(); i++) {
@@ -365,12 +375,14 @@ Status DBImpl::Recover(VersionEdit* edit, bool *save_manifest) {
       return s;
     }
 
+	//设置下一个log文件序号
     // The previous incarnation may not have written any MANIFEST
     // records after allocating this log number.  So we manually
     // update the file number allocation counter in VersionSet.
     versions_->MarkFileNumberUsed(logs[i]);
   }
 
+  //设置记录序号
   if (versions_->LastSequence() < max_sequence) {
     versions_->SetLastSequence(max_sequence);
   }
@@ -426,6 +438,8 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   WriteBatch batch;
   int compactions = 0;
   MemTable* mem = NULL;
+  
+  //读入一条record
   while (reader.ReadRecord(&record, &scratch) &&
          status.ok()) {
     if (record.size() < 12) {
@@ -433,17 +447,23 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
           record.size(), Status::Corruption("log record too small"));
       continue;
     }
+	
+	//创建写batch
     WriteBatchInternal::SetContents(&batch, record);
 
     if (mem == NULL) {
       mem = new MemTable(internal_comparator_);
       mem->Ref();
     }
+	
+	//将一些record写入memtable
     status = WriteBatchInternal::InsertInto(&batch, mem);
     MaybeIgnoreError(&status);
     if (!status.ok()) {
       break;
     }
+	
+	//计算最新的序列号（最后添加的数据序号）
     const SequenceNumber last_seq =
         WriteBatchInternal::Sequence(&batch) +
         WriteBatchInternal::Count(&batch) - 1;
@@ -451,6 +471,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
       *max_sequence = last_seq;
     }
 
+	//memtable已满，需要写入sst0
     if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
       compactions++;
       *save_manifest = true;
@@ -465,6 +486,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     }
   }
 
+  //关闭log文件
   delete file;
 
   // See if we should keep reusing the last log file.
@@ -501,13 +523,18 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   return status;
 }
 
+//写入level 0
 Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
                                 Version* base) {
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
+  
+  //level-0表号
   meta.number = versions_->NewFileNumber();
   pending_outputs_.insert(meta.number);
+  
+  //获取迭代器
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
       (unsigned long long) meta.number);

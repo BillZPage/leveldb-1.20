@@ -74,21 +74,30 @@ Status WriteStringToFileSync(Env* env, const Slice& data,
   return DoWriteStringToFile(env, data, fname, true);
 }
 
+//从fname读取数据到data
 Status ReadFileToString(Env* env, const std::string& fname, std::string* data) {
   data->clear();
   SequentialFile* file;
+  
+  //创建fname的序列化文件对象
   Status s = env->NewSequentialFile(fname, &file);
   if (!s.ok()) {
     return s;
   }
+  
+  //创建8k缓存
   static const int kBufferSize = 8192;
   char* space = new char[kBufferSize];
   while (true) {
     Slice fragment;
+	
+	//从文件中读取8k到fragment
     s = file->Read(kBufferSize, &fragment, space);
     if (!s.ok()) {
       break;
     }
+	
+	//添加数据到data
     data->append(fragment.data(), fragment.size());
     if (fragment.empty()) {
       break;

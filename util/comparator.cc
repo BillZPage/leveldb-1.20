@@ -22,16 +22,20 @@ class BytewiseComparatorImpl : public Comparator {
     return "leveldb.BytewiseComparator";
   }
 
+  //底层调用memcmp
   virtual int Compare(const Slice& a, const Slice& b) const {
     return a.compare(b);
   }
 
+  //获取start小于等于limit的字符串
   virtual void FindShortestSeparator(
       std::string* start,
       const Slice& limit) const {
     // Find length of common prefix
     size_t min_length = std::min(start->size(), limit.size());
     size_t diff_index = 0;
+	
+	//定位到第1个不同字符的索引
     while ((diff_index < min_length) &&
            ((*start)[diff_index] == limit[diff_index])) {
       diff_index++;
@@ -40,6 +44,7 @@ class BytewiseComparatorImpl : public Comparator {
     if (diff_index >= min_length) {
       // Do not shorten if one string is a prefix of the other
     } else {
+	  //转换为ascii
       uint8_t diff_byte = static_cast<uint8_t>((*start)[diff_index]);
       if (diff_byte < static_cast<uint8_t>(0xff) &&
           diff_byte + 1 < static_cast<uint8_t>(limit[diff_index])) {
@@ -66,6 +71,7 @@ class BytewiseComparatorImpl : public Comparator {
 };
 }  // namespace
 
+//使用pthread_once保证只初始化一次
 static port::OnceType once = LEVELDB_ONCE_INIT;
 static const Comparator* bytewise;
 
@@ -73,6 +79,7 @@ static void InitModule() {
   bytewise = new BytewiseComparatorImpl;
 }
 
+//创建比较器
 const Comparator* BytewiseComparator() {
   port::InitOnce(&once, InitModule);
   return bytewise;

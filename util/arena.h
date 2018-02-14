@@ -54,12 +54,16 @@ inline char* Arena::Allocate(size_t bytes) {
   // 0-byte allocations, so we disallow them here (we don't need
   // them for our internal use).
   assert(bytes > 0);
+  
+  //如果申请空间小于已有空间，直接返回空闲内存指针
   if (bytes <= alloc_bytes_remaining_) {
     char* result = alloc_ptr_;
     alloc_ptr_ += bytes;
     alloc_bytes_remaining_ -= bytes;
     return result;
   }
+  
+  //没有足够的空间，调用备用调用
   return AllocateFallback(bytes);
 }
 

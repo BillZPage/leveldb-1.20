@@ -58,7 +58,11 @@ class MemTableIterator: public Iterator {
   virtual void SeekToLast() { iter_.SeekToLast(); }
   virtual void Next() { iter_.Next(); }
   virtual void Prev() { iter_.Prev(); }
+  
+  //返回key
   virtual Slice key() const { return GetLengthPrefixedSlice(iter_.key()); }
+  
+  //返回value
   virtual Slice value() const {
     Slice key_slice = GetLengthPrefixedSlice(iter_.key());
     return GetLengthPrefixedSlice(key_slice.data() + key_slice.size());
@@ -79,6 +83,7 @@ Iterator* MemTable::NewIterator() {
   return new MemTableIterator(&table_);
 }
 
+//将key和value组成一个字符串插入skiplist，skiplist只存储key
 void MemTable::Add(SequenceNumber s, ValueType type,
                    const Slice& key,
                    const Slice& value) {
@@ -87,9 +92,12 @@ void MemTable::Add(SequenceNumber s, ValueType type,
   //  key bytes    : char[internal_key.size()]
   //  value_size   : varint32 of value.size()
   //  value bytes  : char[value.size()]
-  size_t key_size = key.size();
+  //|key_size(4)|key bytes|sequcence number+type(64)|value_size(4)|value bytes|
+  size_t key_size = key.size(); //key value的空间
   size_t val_size = value.size();
   size_t internal_key_size = key_size + 8;
+  
+  //VarintLength(internal_key_size)计算key长度字符串长度
   const size_t encoded_len =
       VarintLength(internal_key_size) + internal_key_size +
       VarintLength(val_size) + val_size;
@@ -108,6 +116,8 @@ void MemTable::Add(SequenceNumber s, ValueType type,
 bool MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
   Slice memkey = key.memtable_key();
   Table::Iterator iter(&table_);
+  
+  //搜索key
   iter.Seek(memkey.data());
   if (iter.Valid()) {
     // entry format is:
